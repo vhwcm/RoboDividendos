@@ -85,7 +85,43 @@ for ticker in b3_tickers:
             #print(f"  PEG Ratio: {peg_ratio}")
             print(f"  Algoritmo: {alg1}")
         
+
+#ordenar os tickers
 sorted_tickers = sorted(not_bad_tickers, reverse=True)
+
+#printar os 10 melhores
 for index, (alg, ticker) in enumerate(sorted_tickers[:10],start=1):
     print(f"Índice: {index}.Ticker: {ticker}")
     print(f"Algoritmo: {alg}")
+
+
+###########################################################3
+'''Melhores Empresas desse algoritmo:
+Índice: 1.Ticker: PETR4.SA
+Algoritmo: 99.59004792596828
+Índice: 2.Ticker: BRAP4.SA
+Algoritmo: 92.34534184396448
+Índice: 3.Ticker: PETR3.SA
+Algoritmo: 88.22240568301373
+Índice: 4.Ticker: TAEE11.SA
+Algoritmo: 70.9228166496814
+Índice: 5.Ticker: BRSR6.SA
+Algoritmo: 52.2398712622757
+Índice: 6.Ticker: CMIG4.SA
+Algoritmo: 50.99379923690057
+Índice: 7.Ticker: ELET6.SA
+Algoritmo: 45.201782806078825
+Índice: 8.Ticker: BBAS3.SA
+Algoritmo: 43.21253466480603
+Índice: 9.Ticker: VALE3.SA
+Algoritmo: 42.64696933065492
+Índice: 10.Ticker: BBDC4.SA
+Algoritmo: 34.546559273873484
+
+
+
+'''
+
+
+
+
