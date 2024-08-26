@@ -3,6 +3,16 @@ import pandas as pd
 import yfinance as yf
     
 
+def get_dividendos(ticker,mes,ano,qnt_stock):
+    stock = yf.Ticker(ticker)
+    dividend = stock.dividends
+    str_temp,k = tempo_em_string(mes,ano)
+    str_mes_passado = tempo_em_string_mes_passado(mes,ano)
+    filtered_dividends = dividend.loc[str_mes_passado:str_temp]
+    dividends = filtered_dividends.sum()*qnt_stock
+    return dividends
+
+
 def atualizar_tempo(mes,ano):
     mes+=1
     if(mes>12):
@@ -14,6 +24,16 @@ def tempo_em_string(mes,ano):
     if(mes<10):
         mes = '0'+str(mes)
     return str(ano)+'-'+str(mes)+'-01',str(ano-10)+'-'+str(mes)+'-01'
+
+def tempo_em_string_mes_passado(mes,ano):
+    if(mes == 1):
+        mes = 12
+        ano -= 1
+    else:
+        mes -= 1
+    if(mes<10):
+        mes = '0'+str(mes)
+    return str(ano)+'-'+str(mes)+'-01'
 
 #conseguir os ticker da B3
 b3_tickers = si.tickers_ibovespa()
@@ -28,7 +48,7 @@ bad_industries = ['Airlines','Travel Services','Residential Construction','Depar
 #definindo e inicializando algumas coisas
 not_bad_tickers = []
 indexs = []
-my_stocks =[]
+my_stocks ={}
 
 
 #valores alteraveis
@@ -103,25 +123,26 @@ while current_year < yearfinish:
                         book_value_per_share = float(info.get('bookValue', 0))
                         p_vpa = (end_price / book_value_per_share) if book_value_per_share != 0 else 0
                 except:
-                    p_vpa = 1  
-            # pe_ratio = float(info.get('trailingPE', 0))
-            #earnings_growth_rate = float(info.get('earningsGrowth', 0)) * 100  # Convertendo para porcentagem
-            #peg_ratio = (pe_ratio / earnings_growth_rate) if earnings_growth_rate != 0 else 0
+                    p_vpa = 2  
+                #pe_ratio = float(info.get('trailingPE', 0))
+                #earnings_growth_rate = float(info.get('earningsGrowth', 0)) * 100  # Convertendo para porcentagem
+                #peg_ratio = (pe_ratio / earnings_growth_rate) if earnings_growth_rate != 0 else 0
                 #alg1 = alg1*((m2_after_price - end_price))/100
                 alg1 = alg1*(100 - (p_vpa)*30 +(m2_after_price - end_price))/100
                 #alg1 = (alg1*3 + (100 - (p_vpa)*30 +(m2_after_price - end_price))*3)/6
                 
                 not_bad_tickers.append((alg1,ticker,end_price,sector))
-                print(f"Ticker: {ticker}")
+                '''print(f"Ticker: {ticker}")
                 print(f"  Indústria: {sector}")
                 print(f"  10 anos dividend yield: {avg_dividend_yield}")
                 print(f"  CAGR: {cagr}")
                 print(f"  dividend payout: {dividend_payout_ratio_current}")
                 print(f"  P/VPA: {p_vpa}")
                 #print(f"  PEG Ratio: {peg_ratio}")
-                print(f"  Algoritmo: {alg1}")
+                print(f"  Algoritmo: {alg1}")'''
             
 
+    
     #ordenar os tickers
     sorted_tickers = sorted(not_bad_tickers, reverse=True)
 
@@ -135,28 +156,44 @@ while current_year < yearfinish:
     valor_por_setor = round(aporte_mensal/q_sectors,2)
     sectores.clear()
     for index, (alg, ticker,end_price,sector) in enumerate(sorted_tickers[:5],start=1):
-        if(sector not in sectores):
+        if(sector not in sectores):            
             sectores.append(sector)
             qnt_stock = int(valor_por_setor/end_price)
             dinheiro += valor_por_setor - qnt_stock*end_price
-            dinheiro -= qnt_stock*end_price
-            my_stocks.append(ticker,qnt_stock)
+            if(ticker not in my_stocks):
+                my_stocks[ticker] = qnt_stock
+            else:
+                my_stocks[ticker] += qnt_stock
             print(f"Índice: {index}.Ticker: {ticker}")
+            print(f"quantidade de ações: {qnt_stock}")
+            print(f"Preço: {end_price}")
+            print(f"Setor: {sector}")
             print(f"Algoritmo: {alg}")
-    print(my_stocks)
+
+    print()
+    aporte_mensal = 1000
+    for st, qnt in my_stocks.items():
+        dividendos_recebidos = get_dividendos(st,current_month,current_year,qnt)
+        aporte_mensal += dividendos_recebidos
+        print(f"Data: {str_temp}")       
+        print(f"Dividendos recebidos: {dividendos_recebidos}")
+        print(f"Aporte mensal: {aporte_mensal}")
+        print(f"{st}: {qnt}")
     #atualizar o tempo
     current_month,current_year = atualizar_tempo(current_month,current_year)
 
+
+
+for st, qnt in my_stocks.items():
+    stock = yf.Ticker(st)
+    stock_price = stock.history(period='1d')['Close'].iloc[-1]
+    dinheiro += qnt*stock_price
+    print(f"{st}: {qnt}")
 
 print(f"Dinheiro inicial: {dinheiro_inicial}")
 print(f"Dinheiro final: {dinheiro}")
 
 ###############
-# ############################################3
-'''Melhores Empresas desse algoritmo:
+#############################################3
 
-
-
-
-'''
 
