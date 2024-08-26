@@ -56,10 +56,9 @@ aporte_mensal = 1000
 dinheiro_inicial = 0
 dinheiro = dinheiro_inicial
 current_month = 1
-year = 2020
-current_year = 2020
+current_year = 2015
 yearfinish = 2022
-
+dividendos_totais = 0
 
 
 while current_year < yearfinish:
@@ -160,6 +159,7 @@ while current_year < yearfinish:
             sectores.append(sector)
             qnt_stock = int(valor_por_setor/end_price)
             dinheiro += valor_por_setor - qnt_stock*end_price
+            dinheiro_inicial += 1000
             if(ticker not in my_stocks):
                 my_stocks[ticker] = qnt_stock
             else:
@@ -175,6 +175,7 @@ while current_year < yearfinish:
     for st, qnt in my_stocks.items():
         dividendos_recebidos = get_dividendos(st,current_month,current_year,qnt)
         aporte_mensal += dividendos_recebidos
+        dividendos_totais += dividendos_recebidos
         print(f"Data: {str_temp}")       
         print(f"Dividendos recebidos: {dividendos_recebidos}")
         print(f"Aporte mensal: {aporte_mensal}")
@@ -190,7 +191,7 @@ for st, qnt in my_stocks.items():
     dinheiro += qnt*stock_price
     print(f"{st}: {qnt}")
 
-print(f"Dinheiro inicial: {dinheiro_inicial}")
+print(f"Dinheiro Investido do bolso: {dinheiro_inicial}")
 print(f"Dinheiro final: {dinheiro}")
 
 ###############
