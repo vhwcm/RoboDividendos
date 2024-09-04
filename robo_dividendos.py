@@ -7,8 +7,8 @@ def get_dividendos(ticker,mes,ano,qnt_stock):
     stock = yf.Ticker(ticker)
     dividend = stock.dividends
     str_temp,k = tempo_em_string(mes,ano)
-    str_mes_passado = tempo_em_string_mes_passado(mes,ano)
-    filtered_dividends = dividend.loc[str_mes_passado:str_temp]
+    mes_futuro = tempo_em_string_mes_futuro(mes,ano)
+    filtered_dividends = dividend.loc[str_temp:mes_futuro]
     dividends = filtered_dividends.sum()*qnt_stock
     return dividends
 
@@ -25,12 +25,28 @@ def tempo_em_string(mes,ano):
         mes = '0'+str(mes)
     return str(ano)+'-'+str(mes)+'-01',str(ano-10)+'-'+str(mes)+'-01'
 
-def tempo_em_string_mes_passado(mes,ano):
-    if(mes == 1):
-        mes = 12
-        ano -= 1
+def tempo_em_strign_10_anos(mes, ano):
+    anos = []
+    if(mes<10):
+        str_mes = '0'+str(mes)
     else:
-        mes -= 1
+        str_mes = str(mes)
+    
+    ano -= 9
+    for i in range(10):
+        anos.append(str(ano)+'-'+str(mes)+'-01')
+        ano += 1 
+    
+    return anos
+    
+
+
+def tempo_em_string_mes_futuro(mes,ano):
+    if(mes == 12):
+        mes = 1
+        ano += 1
+    else:
+        mes += 1
     if(mes<10):
         mes = '0'+str(mes)
     return str(ano)+'-'+str(mes)+'-01'
@@ -55,11 +71,10 @@ my_stocks ={}
 aporte_mensal = 1000
 dinheiro_inicial = 0
 dinheiro = dinheiro_inicial
-current_month = 1
-current_year = 2015
-yearfinish = 2022
+current_year = int(input("BACKTEST\nDigite o ano de ínicio: "))
+current_month = int(input("Selecione o mês de início"))
+yearfinish = int(input("Digite o ano final: "))
 dividendos_totais = 0
-
 
 while current_year < yearfinish:
     # Iterar sobre os tickers
@@ -71,28 +86,35 @@ while current_year < yearfinish:
         #todos os dividendos
         dividend = stock.dividends
         #calcular o médio dos últimos 10 anos
+        
         try:
             str_temp,str_temp_10y = tempo_em_string(current_month,current_year)
             his = stock.history(start=str_temp_10y,end=str_temp)['Close']
             start_price = his.iloc[0]
             end_price = his.iloc[-1]
             m2_after_price = his.iloc[-60]
-            filtered_dividends = dividend.loc[str_temp_10y:str_temp]
-            dividends = filtered_dividends.resample('Y').sum()
-            avg_dividend_yield = (dividends.mean() / stock.history(start=str_temp_10y,end=str_temp)['Close'].mean())*100
+            anos = tempo_em_strign_10_anos(current_month,current_year)
+            y1_dividend_yield = [] 
+            for i in range(9):
+                filtered_dividends = dividend.loc[anos[i]:anos[i+1]]
+                dividends = filtered_dividends.sum()
+                y1_dividend_yield.append(dividends/stock.history(start=anos[i],end=anos[i+1])['Close'].mean())
+            avg_dividend_yield = pd.Series(y1_dividend_yield).mean()*100    
         except:
             avg_dividend_yield = 0;
+
+        print(avg_dividend_yield)
         
         cagr = (end_price / start_price) ** (1 / 10) - 1
 
         #primeira peneira, retirando os setores ruins e com dividendos menores que 3% e cagr menor que 5%
         if sector not in bad_industries and avg_dividend_yield > 3 and cagr > 0.05:    
             financials = stock.financials.T
-            financials = stock.financials.T    
             # Obter EPS mais recente
             eps = float(info.get('trailingEps', 0))
             # Obter dividendos pagos no último ano
-            last_year_dividends = dividends.iloc[-1] if not dividends.empty else 0
+            dividend = dividend.resample("YE").sum()
+            last_year_dividends = dividend.iloc[-1] if not dividend.empty else 0
             # Calcular o dividend payout ratio atual
             try:
                 dividend_payout_ratio_current = (last_year_dividends / eps) if eps != 0 else None
@@ -102,11 +124,32 @@ while current_year < yearfinish:
             
             #algoritmo
             ############################################################################################
-            alg1 = (avg_dividend_yield*60*10 + cagr*20*500 + dividend_payout_ratio_current*20*100)/100
-            if(sector not in good_industries):
-                alg1 = alg1 * 0.8
+            x = avg_dividend_yield - 6
+            alg_avg_dividend_yield = (1 + (x/abs(x))*(x**2/(15+x**2))**0.3)/2
+            x = cagr - 0.1
+            x = m2_after_price/end_price 
+            alg_queda = (x/abs(x))*(x**4/(1+(x**4)))
+            alg_cagr = (1 + (x/abs(x))*(x**2/(0.07+x**2))**0.5)/2
+            x = dividend_payout_ratio_current*100 - 25
+            alg_dividend_payout = (1 + (x/abs(x))*(x**2/(700 + x**2)))/2
+            alg = alg_avg_dividend_yield*0.6 + alg_cagr*0.1 + alg_dividend_payout*0.1 + alg_queda*0.2 
+            print("Ticker: ", ticker)
+            print("Dividend yield:", avg_dividend_yield)
+            print("alg dividend yirld", alg_avg_dividend_yield)
+            print("cagr: ", cagr)
+            print("alg cagr: ", alg_cagr)
+            print("dividend payout ", dividend_payout_ratio_current)
+            print("alg payout ", alg_dividend_payout)
+            print("alg_queda" , alg_queda)
+            print("alg final: ", alg,"\n\n")
             ###########################################################################################3
-            if(alg1 > 0.6):
+            if(sector not in good_industries):
+                alg = alg * 0.9
+            not_bad_tickers.append((alg,ticker,end_price,sector))
+        else:
+            b3_tickers.remove(ticker)
+                
+            '''if(alg > 0.5):
                 book_value_per_share = None
                 try:
                     for date in financials.columns:
@@ -126,22 +169,7 @@ while current_year < yearfinish:
                 #pe_ratio = float(info.get('trailingPE', 0))
                 #earnings_growth_rate = float(info.get('earningsGrowth', 0)) * 100  # Convertendo para porcentagem
                 #peg_ratio = (pe_ratio / earnings_growth_rate) if earnings_growth_rate != 0 else 0
-                #alg1 = alg1*((m2_after_price - end_price))/100
-                alg1 = alg1*(100 - (p_vpa)*30 +(m2_after_price - end_price))/100
-                #alg1 = (alg1*3 + (100 - (p_vpa)*30 +(m2_after_price - end_price))*3)/6
-                
-                not_bad_tickers.append((alg1,ticker,end_price,sector))
-                '''print(f"Ticker: {ticker}")
-                print(f"  Indústria: {sector}")
-                print(f"  10 anos dividend yield: {avg_dividend_yield}")
-                print(f"  CAGR: {cagr}")
-                print(f"  dividend payout: {dividend_payout_ratio_current}")
-                print(f"  P/VPA: {p_vpa}")
-                #print(f"  PEG Ratio: {peg_ratio}")
-                print(f"  Algoritmo: {alg1}")'''
-            
-
-    
+                '''                
     #ordenar os tickers
     sorted_tickers = sorted(not_bad_tickers, reverse=True)
 
@@ -154,6 +182,7 @@ while current_year < yearfinish:
     q_sectors = len(sectores)
     valor_por_setor = round(aporte_mensal/q_sectors,2)
     sectores.clear()
+    print("COMPRAS DO MÊS:")
     for index, (alg, ticker,end_price,sector) in enumerate(sorted_tickers[:5],start=1):
         if(sector not in sectores):            
             sectores.append(sector)
@@ -164,11 +193,12 @@ while current_year < yearfinish:
                 my_stocks[ticker] = qnt_stock
             else:
                 my_stocks[ticker] += qnt_stock
-            print(f"Índice: {index}.Ticker: {ticker}")
-            print(f"quantidade de ações: {qnt_stock}")
-            print(f"Preço: {end_price}")
-            print(f"Setor: {sector}")
-            print(f"Algoritmo: {alg}")
+            print(f"    Índice: {index}.Ticker: {ticker}")
+            print(f"    quantidade de ações: {qnt_stock}")
+            print(f"    Preço: {end_price}")
+            print(f"    Setor: {sector}")
+            print(f"    Algoritmo: {alg}")
+            print("\n")
 
     print()
     aporte_mensal = 1000
@@ -176,10 +206,12 @@ while current_year < yearfinish:
         dividendos_recebidos = get_dividendos(st,current_month,current_year,qnt)
         aporte_mensal += dividendos_recebidos
         dividendos_totais += dividendos_recebidos
-        print(f"Data: {str_temp}")       
-        print(f"Dividendos recebidos: {dividendos_recebidos}")
-        print(f"Aporte mensal: {aporte_mensal}")
-        print(f"{st}: {qnt}")
+        print(f"CARTEIRA COMPLETA DO MÊS:")               
+        print(f"    Data: {str_temp}")       
+        print(f"    Dividendos recebidos: {dividendos_recebidos}")
+        print(f"    Aporte mensal: {aporte_mensal}")
+        print(f"    {st}: {qnt}")
+        print("\n\n")
     #atualizar o tempo
     current_month,current_year = atualizar_tempo(current_month,current_year)
 
